@@ -69,14 +69,20 @@
 .info {
     flex-grow: 1;
     margin-left: 1em;
+    display: flex;
+    flex-direction: column;
 }
 
-.types {display: flex;}
+.types {
+    display: flex;
+    flex-grow: 1;
+    margin-top: 10px;
+}
 
 .types .type {
     flex-grow: 1;
     margin: 0 0.5em;
-
+    height: fit-content;
     border: 2px solid #00000099;
     border-radius: 20px;
 
@@ -90,16 +96,25 @@
     display: flex;
     flex-grow: 1;
     align-items: flex-end;
-    padding-bottom: 1em;
 }
 
 .sprite_and_name {
     display: flex;
     flex-direction: row;
     flex-grow: 1;
+    margin-left: 10px;
 }
 
 .sprite_container img {margin-bottom: -0.2em;}
+
+.sprite {
+    width: 96px;
+    height: 96px;
+    background-image: url('../data/spritesheet.png');
+    background-repeat: no-repeat;
+    transform-origin: left bottom;
+    margin-bottom: -0.2em;
+}
 
 .basic_info .name {
     font-size: 1.25em;
@@ -115,8 +130,6 @@
 }
 
 .pokemon_card .img-container {
-    width: 5em;
-    height: auto;
     display: flex;
     flex-direction: column;
     justify-content: center;

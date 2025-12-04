@@ -5,13 +5,6 @@ body {
     margin: 0;
 }
 
-#loading {
-    text-align: center;
-    display: block;
-}
-
-#loading img {width: 100px;}
-
 #pokedex_name {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 3em;

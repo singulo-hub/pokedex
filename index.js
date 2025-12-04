@@ -3,86 +3,20 @@ const search_bar = document.getElementById('search_bar');
 const search_error = document.getElementById('search_error');
 const generation_container = document.getElementById('generation_container');
 const pokedex_name = document.getElementById('pokedex_name');
-const loading = document.getElementById('loading');
 
 // In milliseconds
 const card_anim_speed = 1000;
 
 let timeout = null;
-let generations = null;
 // Helps keep track of the current gen for the buttons
 let current_generation = 1;
 // Number is used for staggering the animation
 let number = 0;
-let promises = null;
+// All pokemon data from local JSON
+let allPokemonData = [];
+// Current displayed pokemon for search filtering
+let currentPokemon = [];
 let anim_timeouts = [];
-
-const changeGeneration = async (url, new_generation, button_id) => {
-    current_generation = new_generation;
-
-    // Clear disabled from each generation button
-    const children = Array.from(generation_container.children);
-    children.forEach(child => {
-        const button = Array.from(child.children)[0];
-
-        if (button.id == button_id) {
-            // Disable the active generation button
-            button.disabled = true;
-            button.style.color = '#fff';
-            button.style.cursor = 'default';
-        } else {
-            // Enable the others
-            button.disabled = false;
-            button.style.color = '#999';
-            button.style.cursor = 'pointer';
-        }
-    });
-
-    search_bar.value = '';
-    try {
-        const result = await fetch(url);
-
-        if (result.ok) {
-            const generation = await result.json();
-
-            const limit = generation.pokemon_species.length;
-            const offset = generation.pokemon_species[0].url.slice(-4, -1) - 1;
-            const name = generation.main_region.name[0].toUpperCase() + generation.main_region.name.slice(1);
-            
-            pokedex_name.innerHTML = `${name} Pokédex`;
-            pokemon_container.innerHTML = '';
-            search_error.textContent = '';
-
-            getAllPokemon(`https://pokeapi.co/api/v2/pokemon/?limit=${limit}&offset=${offset}`, current_generation);
-        }
-    } catch(e) {errorShake(e);}
-}
-const getGenerations = async (url) => {
-    try {
-        const result = await fetch(url);
-
-        if (result.ok) {
-            generations = await result.json();
-
-            for (let number = 0; number < generations.count; number++) {
-                const generation_button = document.createElement('div');
-                generation_button.classList.add('generation_button_container');
-
-                generation_button.innerHTML = `
-                    <button type="button" id="generation_button_${number + 1}" onclick="changeGeneration('${generations.results[number].url}', ${number + 1}, 'generation_button_${number + 1}')">${number + 1}</button>`;
-                
-                if ((number + 1) == 1) {
-                    const button = Array.from(generation_button.children)[0];
-                    button.disabled = true;
-                    button.style.color = '#fff';
-                    button.style.cursor = 'default';
-                }
-
-                generation_container.appendChild(generation_button);
-            }
-        }
-    } catch(e) {errorShake(e);}
-}
 
 // These are all the colors I use for the background of each pokemon card
 const type_colors = {
@@ -106,48 +40,88 @@ const type_colors = {
     fairy:'#f0b6bc'
 }
 
-// Uses the pokeAPI to get a limited amount within an offset
-const getAllPokemon = async (url, generation) => {
-    // Show the loading Pikachu
-    loading.style.display = 'block';
+// Generation data with region names
+const generations = [
+    { id: 1, name: 'Kanto' },
+    { id: 2, name: 'Johto' },
+    { id: 3, name: 'Hoenn' },
+    { id: 4, name: 'Sinnoh' },
+    { id: 5, name: 'Unova' },
+    { id: 6, name: 'Kalos' },
+    { id: 7, name: 'Alola' },
+    { id: 8, name: 'Galar' },
+    { id: 9, name: 'Paldea' }
+];
 
+// Load all pokemon data from local JSON
+const loadPokemonData = async () => {
     try {
-        const result = await fetch(url);
-
-        if (result.ok) {
-            const pokemon = await result.json();
-            
-            const all_pokemon = pokemon.results.map((a_pokemon) => {
-                return getPokemon(a_pokemon.name);
-            });
-            promises = await Promise.all(all_pokemon);
-
-            number = 0;
-            
-            promises.forEach(pokemon => {
-                if (current_generation == generation) {
-                    createPokemonCard(pokemon);
-                }
-            });
-        } else {errorShake(`No results found for ${id}...`);}
-    } catch(e) {errorShake(e);}
-
-    // Hide the loading Pikachu
-    loading.style.display = 'none';
+        const response = await fetch('data/all-pokemon.json');
+        allPokemonData = await response.json();
+        
+        // Create generation buttons
+        createGenerationButtons();
+        
+        // Load first generation
+        changeGeneration(1);
+    } catch(e) {
+        errorShake('Failed to load Pokemon data');
+        console.error(e);
+    }
 }
 
-// Uses the pokeAPI to get a Pokemon
-getPokemon = async (id) => {
-    const url = `https://pokeapi.co/api/v2/pokemon/${id}`;
+const createGenerationButtons = () => {
+    generations.forEach((gen) => {
+        const generation_button = document.createElement('div');
+        generation_button.classList.add('generation_button_container');
 
-    try {
-        const result = await fetch(url);
+        generation_button.innerHTML = `
+            <button type="button" id="generation_button_${gen.id}" onclick="changeGeneration(${gen.id})">${gen.id}</button>`;
+        
+        if (gen.id === 1) {
+            const button = Array.from(generation_button.children)[0];
+            button.disabled = true;
+            button.style.color = '#fff';
+            button.style.cursor = 'default';
+        }
 
-        if (result.ok) {
-            const pokemon = await result.json();
-            return Promise.resolve(pokemon);
-        } else {errorShake(`No results found for ${id}...`);}
-    } catch(e) {errorShake(e);}
+        generation_container.appendChild(generation_button);
+    });
+}
+
+const changeGeneration = (genId) => {
+    current_generation = genId;
+    const gen = generations.find(g => g.id === genId);
+
+    // Clear disabled from each generation button
+    const children = Array.from(generation_container.children);
+    children.forEach(child => {
+        const button = Array.from(child.children)[0];
+
+        if (button.id === `generation_button_${genId}`) {
+            button.disabled = true;
+            button.style.color = '#fff';
+            button.style.cursor = 'default';
+        } else {
+            button.disabled = false;
+            button.style.color = '#999';
+            button.style.cursor = 'pointer';
+        }
+    });
+
+    search_bar.value = '';
+    search_error.textContent = '';
+    
+    pokedex_name.innerHTML = `${gen.name} Pokédex`;
+    pokemon_container.innerHTML = '';
+
+    // Filter pokemon by generation
+    currentPokemon = allPokemonData.filter(p => p.gen === genId);
+    
+    number = 0;
+    currentPokemon.forEach(pokemon => {
+        createPokemonCard(pokemon);
+    });
 }
 
 // Shake the search bar when the search fails and show error message
@@ -173,17 +147,20 @@ const searchPokemon = async () => {
         let search_results = [];
 
         if (search_value != '') {
-            for (let index = 0; index < promises.length; index++) {
+            for (let index = 0; index < currentPokemon.length; index++) {
                 // First search for names
-                if (promises[index].name.search(search_value) != -1) {
+                if (currentPokemon[index].name.toLowerCase().search(search_value) != -1) {
                     search_results.push(index);
+                    continue;
                 }
 
                 // Then search for types
-                for (let type_index = 0; type_index < promises[index].types.length; type_index++)
-                    if (promises[index].types[type_index].type.name.search(search_value) != -1) {
+                for (let type_index = 0; type_index < currentPokemon[index].types.length; type_index++) {
+                    if (currentPokemon[index].types[type_index].toLowerCase().search(search_value) != -1) {
                         search_results.push(index);
+                        break;
                     }
+                }
             }
 
             // Clear the animation timeouts
@@ -247,40 +224,29 @@ function createPokemonCard(pokemon) {
     const pokemon_card = document.createElement('div');
     pokemon_card.classList.add('pokemon_card');
     
-    const types = pokemon.types.map(element => element.type.name);
+    const types = pokemon.types;
     let type_innerHTML = `<span class='type'>${types[0].toUpperCase()}</span>`;
     if (types.length > 1) {
         type_innerHTML += `<span class='type'>${types[1].toUpperCase()}</span>`;
     }
 
-    const female_index = pokemon.species.name.search('-f')
-    const male_index = pokemon.species.name.search('-m')
-    let name = '';
+    let name = pokemon.name;
     
     // Very special case for the Nidoran family
-    if (female_index != -1 || male_index != -1) {
-        // Went for species name instead of pokemon.name because some Pokémon have difficult names to account for (eg #386)
-        if (female_index != -1) {
-            name = pokemon.species.name[0].toUpperCase() + pokemon.species.name.slice(1, -2) + '♀';
-        } else {
-            name = pokemon.species.name[0].toUpperCase() + pokemon.species.name.slice(1, -2) + '♂';
-        }
-    } else {
-        name = pokemon.species.name[0].toUpperCase() + pokemon.species.name.slice(1);
+    if (name.endsWith('-f')) {
+        name = name.slice(0, -2) + '♀';
+    } else if (name.endsWith('-m')) {
+        name = name.slice(0, -2) + '♂';
     }
 
-    let sprite = pokemon['sprites']['versions']['generation-viii']['icons']['front_default'];
+    // Calculate sprite position from spritesheet
+    const SPRITE_SIZE = 96;
+    const spriteX = pokemon.spriteX * SPRITE_SIZE;
+    const spriteY = pokemon.spriteY * SPRITE_SIZE;
 
-    // Some Pokemon do not have a generation 8 sprite, replace with the ten questions pokemon
-    if (sprite == null) {
-        sprite = `images/unknown.png`;
-    }
-
-    // Calculate the total stats of the pokemon
-    let total_stats = 0;
-    pokemon['stats'].forEach(stat => {
-        total_stats += stat.base_stat;
-    });
+    // Use pre-calculated BST from JSON
+    const stats = pokemon.stats;
+    const total_stats = pokemon.bst;
 
     let stats_innerHTML = `
     <table class='stats'>
@@ -289,36 +255,36 @@ function createPokemonCard(pokemon) {
                 <div class='stat_box hp'></div>
                 HP
             </th>
-            <th>${pokemon['stats'][0].base_stat}</th>
+            <th>${stats.hp}</th>
             <th>
                 <div class='stat_box sp_atk'></div>
                 SP. ATK
             </th>
-            <th>${pokemon['stats'][3].base_stat}</th>
+            <th>${stats.spa}</th>
         </tr>
         <tr>
             <th>
                 <div class='stat_box atk'></div>
                 ATK
             </th>
-            <th>${pokemon['stats'][1].base_stat}</th>
+            <th>${stats.atk}</th>
             <th>
                 <div class='stat_box sp_def'></div>
                 SP. DEF
             </th>
-            <th>${pokemon['stats'][4].base_stat}</th>
+            <th>${stats.spd}</th>
         </tr>
         <tr>
             <th>
                 <div class='stat_box def'></div>
                 DEF
             </th>
-            <th>${pokemon['stats'][2].base_stat}</th>
+            <th>${stats.def}</th>
             <th>
                 <div class='stat_box speed'></div>
                 SPEED
             </th>
-            <th>${pokemon['stats'][5].base_stat}</th>
+            <th>${stats.spe}</th>
         </tr>
         <tr>
             <th class='total'>TOTAL</th>
@@ -326,7 +292,7 @@ function createPokemonCard(pokemon) {
             <th></th>
             <th>
                 <a class='bulb_link' href='https://bulbapedia.bulbagarden.net/wiki/${name}_(Pokémon)' target='_blank'>
-                    <img src='images/bulbapedia.png'>
+                    <img src='data/bulbapedia.png'>
                 </a>
             </th>
         </tr>
@@ -338,13 +304,8 @@ function createPokemonCard(pokemon) {
             <div class='pokemon_card_front'>
                 <div class='info'>
                     <div class='basic_info'>
-                        <span class='number'>#${('000' + pokemon.id).slice (-3)}</span>
+                        <span class='number'>#${('000' + pokemon.id).slice(-3)}</span>
                         <div class='sprite_and_name'>
-                            <div class='sprite_container'>
-                                <img class='sprite' src='
-                                    ${sprite}
-                                '>
-                            </div>
                             <h3 class='name'>${name}</h3>
                         </div>
                     </div>
@@ -353,7 +314,7 @@ function createPokemonCard(pokemon) {
                     </div>
                 </div>
                 <div class='img-container'>
-                    <img src='${pokemon['sprites']['other']['official-artwork']['front_default']}'>
+                    <div class='sprite' style='background-position: -${spriteX}px -${spriteY}px;'></div>
                 </div>
             </div>
             <div class='pokemon_card_back'>
@@ -367,27 +328,30 @@ function createPokemonCard(pokemon) {
     // Color the front and back with a gradient if more than one type is present
     const pokemon_card_front = Array.from(Array.from(pokemon_card.children)[0].children)[0];
     const pokemon_card_back = Array.from(Array.from(pokemon_card.children)[0].children)[1];
-    if (types.length > 1) {
+    const type1 = types[0].toLowerCase();
+    const type2 = types.length > 1 ? types[1].toLowerCase() : null;
+    
+    if (type2) {
         pokemon_card_front.style = `background: -webkit-linear-gradient(
             to right,
-            ${type_colors[types[0]]},
-            ${type_colors[types[1]]})`;
+            ${type_colors[type1]},
+            ${type_colors[type2]})`;
         pokemon_card_back.style = `background: -webkit-linear-gradient(
             to right,
-            ${type_colors[types[0]]},
-            ${type_colors[types[1]]})`;
+            ${type_colors[type1]},
+            ${type_colors[type2]})`;
 
         pokemon_card_front.style = `background: linear-gradient(
         to right,
-        ${type_colors[types[0]]},
-        ${type_colors[types[1]]})`;
+        ${type_colors[type1]},
+        ${type_colors[type2]})`;
         pokemon_card_back.style = `background: linear-gradient(
             to right,
-            ${type_colors[types[0]]},
-            ${type_colors[types[1]]})`;
+            ${type_colors[type1]},
+            ${type_colors[type2]})`;
     } else {
-        pokemon_card_front.style = `background:${type_colors[types[0]]}`;
-        pokemon_card_back.style = `background:${type_colors[types[0]]}`;
+        pokemon_card_front.style = `background:${type_colors[type1]}`;
+        pokemon_card_back.style = `background:${type_colors[type1]}`;
     }
     pokemon_container.appendChild(pokemon_card);
 
@@ -405,8 +369,5 @@ function flipCard(card) {
 // Clear the search bar from previous visits
 search_bar.value = '';
 
-// Get the generations
-getGenerations('https://pokeapi.co/api/v2/generation/');
-
-// Get the first generation
-getAllPokemon(`https://pokeapi.co/api/v2/pokemon/?limit=151&offset=0`, 1);
+// Load pokemon data and initialize
+loadPokemonData();
