@@ -142,7 +142,7 @@
 }
 
 .move_card_up {
-    animation: move_card_up_anim 1s ease-out;
+    animation: move_card_up_anim 0.2s ease-out;
     animation-play-state: paused;
 }
 

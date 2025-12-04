@@ -214,7 +214,7 @@ function addMoveUpAnim(pokemon_card) {
             pokemon_card.classList.remove('move_card_up');
             pokemon_card.style.animationPlayState = 'paused';
         }, card_anim_speed);
-    }, number * 100);
+    }, number * 20);
 
     anim_timeouts.push(anim_timeout);
     number += 1;
